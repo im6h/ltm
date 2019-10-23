@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="style.css">
+  <title>Webchat demo</title>
+</head>
+
+<body>
+<div class="head" id="head">
+  <input type="text" id="textUsername" placeholder="Input your name">
+  <button type="button" onclick="sendUsername()">Join</button>
+</div>
+<div class="wrap" id="wrap">
+  <div class="chat">
+    <div class="title">
+      <h3>Demo title chat</h3>
+    </div>
+    <div class="listMessage">
+      <textarea id="textAreaMessage"></textarea>
+    </div>
+    <div class="input" >
+      <input type="text" id="textMessage">
+      <button type="button" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+  <div class="listUser">
+    <ul>
+      <li>Dang Vu</li>
+      <li>Minh Vu</li>
+      <li>Quan Vu</li>
+      <li>Justee</li>
+    </ul>
+  </div>
+</div>
+<script lang="js" src="script.js"></script>
+</body>
+
+</html>
