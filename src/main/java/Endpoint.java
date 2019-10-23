@@ -6,9 +6,7 @@ import message.MessageType;
 import javax.websocket.*;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 @ServerEndpoint(value = "/socket")
 public class Endpoint {
@@ -34,24 +32,31 @@ public class Endpoint {
                 messageResponse.setMessageType(type);
                 messageResponse.setContent(content + " login");
                 String msg = gson.toJson(messageResponse);
-                users.forEach(u->{
-                    try {
-                        u.getBasicRemote().sendText(msg);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
+                sendText(msg);
             }
         }
         if (type == MessageType.MESSAGE){
             messageResponse.setMessageType(type);
             messageResponse.setContent(session.getUserProperties().get("name") + ":" +content);
             String msg = gson.toJson(messageResponse);
+            sendText(msg);
+        }
+        if (type == MessageType.LISTUSER){
+            List<String> userOnline = new ArrayList<>();
             users.forEach(u->{
-                try {
-                    u.getBasicRemote().sendText(msg);
-                } catch (IOException e) {
-                    e.printStackTrace();
+                String name = (String) u.getUserProperties().get("name");
+                userOnline.add(name);
+            });
+            messageResponse.setMessageType(type);
+            messageResponse.setContent(gson.toJson(userOnline));
+            String msg = gson.toJson(messageResponse);
+            users.forEach(u->{
+                if (session.equals(u)){
+                    try {
+                        u.getBasicRemote().sendText(msg);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             });
         }
@@ -68,5 +73,15 @@ public class Endpoint {
     @OnError
     public void onError(Throwable throwable){
         throwable.printStackTrace();
+    }
+
+    public void sendText(String msg){
+        users.forEach(u->{
+            try {
+                u.getBasicRemote().sendText(msg);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 }
