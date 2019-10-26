@@ -3,6 +3,7 @@ package message;
 public enum MessageType {
     LOGIN,
     MESSAGE,
-    LISTUSER,
-    CREATEROOM
+    LIST_USER,
+    CREATE_ROOM,
+    SHOW_ROOM,
 }
