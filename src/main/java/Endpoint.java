@@ -32,7 +32,7 @@ public class Endpoint {
             handleMessageListUser(messageReceive,session);
         }
     }
-    
+
     /* chức năng lấy về danh sách user đang online trên hệ thống */
     private void handleMessageListUser(MessageReceive messageReceive, Session session) {
         MessageResponse messageResponse = new MessageResponse();
