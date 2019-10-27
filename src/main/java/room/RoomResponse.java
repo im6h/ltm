@@ -7,14 +7,14 @@ import java.util.List;
 
 public class RoomResponse {
     private String message;
-    private List<String> rooms = new ArrayList<>();
+    private String nameRoom;
 
     public RoomResponse() {
     }
 
-    public RoomResponse(String message, List<String> rooms) {
+    public RoomResponse(String message, String nameRoom) {
         this.message = message;
-        this.rooms = rooms;
+        this.nameRoom = nameRoom;
     }
 
     public String getMessage() {
@@ -25,15 +25,11 @@ public class RoomResponse {
         this.message = message;
     }
 
-    public List<String> getRooms() {
-        return rooms;
+    public String getNameRoom() {
+        return nameRoom;
     }
 
-    public void setRooms(List<String> rooms) {
-        this.rooms = rooms;
-    }
-
-    public void addRoom(String roomName){
-        rooms.add(roomName);
+    public void setNameRoom(String nameRoom) {
+        this.nameRoom = nameRoom;
     }
 }

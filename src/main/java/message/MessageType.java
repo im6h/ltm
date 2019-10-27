@@ -4,6 +4,8 @@ public enum MessageType {
     LOGIN,
     MESSAGE,
     LIST_USER,
-    CREATE_ROOM,
-    SHOW_ROOM,
+    LIST_ROOM,
+    JOIN_ROOM,
+    GET_MESSAGE,
+    SEND_MESSAGE,
 }

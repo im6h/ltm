@@ -17,6 +17,7 @@ import java.util.*;
 public class Endpoint {
 
     private static Set<Session> users = Collections.synchronizedSet(new HashSet<Session>());
+    private static Set<Room> rooms = Collections.synchronizedSet(new HashSet<>());
 
     /* hàm kết nối*/
     @OnOpen
@@ -28,48 +29,134 @@ public class Endpoint {
     @OnMessage
     public void onMessage(Session session, String msgJson) throws IOException {
         Gson gson = new Gson();
+        List<String> addRoom = new ArrayList<>();
+        Set<Room> rooms = Collections.synchronizedSet(new HashSet<>());
         if (msgJson.contains("CREATE_ROOM")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
             handleMessageCreateRoom(roomReceive, session);
 
+        } else if (msgJson.contains("SEND_MESSAGE")) {
+            RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
+            handleSendMessage(roomReceive,session);
         } else {
             MessageReceive messageReceive = gson.fromJson(msgJson, MessageReceive.class);
             if (messageReceive.getMessageType() == MessageType.LOGIN) {
                 handleLoginMessage(messageReceive, session);
-            } else if (messageReceive.getMessageType() == MessageType.MESSAGE) {
-                handleMessageMessage(messageReceive, session);
             } else if (messageReceive.getMessageType() == MessageType.LIST_USER) {
                 handleMessageListUser(messageReceive, session);
+            } else if (messageReceive.getMessageType() == MessageType.GET_MESSAGE) {
+                handleGetMessageRequest(messageReceive,session);
             }
         }
     }
+
+    private void handleSendMessage(RoomReceive messageReceive,Session set) {
+        Gson gson = new Gson();
+        String nameRoom = messageReceive.getRoomName();
+        String message = messageReceive.getUsers();
+        Set<Session> user = new HashSet<>();
+        for (Room room : rooms){
+            if (room.getName().equals(nameRoom)){
+                user = room.getUsers();
+            }
+        }
+        List<String> msgs = new ArrayList<>();
+        for (Session session : users) {
+            for (Session session1 : user) {
+                if (session1.getId().equals(session.getId())) {
+                    String msg = (String) session1.getUserProperties().get("name") + " : " + message;
+                    msgs.add(msg);
+                }
+            }
+        }
+        String listMsg = gson.toJson(msgs);
+        MessageResponse messageResponse = new MessageResponse(MessageType.SEND_MESSAGE, listMsg);
+        String json = gson.toJson(messageResponse);
+        try {
+            set.getBasicRemote().sendText(json);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleGetMessageRequest(MessageReceive messageReceive,Session ses) {
+        Gson gson = new Gson();
+        Set<Session> user = new HashSet<>();
+        String content = messageReceive.getContent();
+
+        for (Room room : rooms) {
+            if (room.getName().equals(content)) {
+                user = room.getUsers();
+            }
+        }
+        /* gui message den cac user  co trong nhom*/
+        List<String> msgs = new ArrayList<>();
+        for (Session session : users) {
+            for (Session session1 : user) {
+                if (session1.getId().equals(session.getId())) {
+                    String msg = (String) session1.getUserProperties().get("name") + " login";
+                    msgs.add(msg);
+                }
+            }
+        }
+        String listMsg = gson.toJson(msgs);
+        MessageResponse messageResponse = new MessageResponse(MessageType.GET_MESSAGE, listMsg);
+        String json = gson.toJson(messageResponse);
+        try {
+            ses.getBasicRemote().sendText(json);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     /* hàm xử lý tạo room */
     private void handleMessageCreateRoom(RoomReceive messageReceive, Session session) {
         Gson gson = new Gson();
         String roomName = messageReceive.getRoomName();
         String names = messageReceive.getUsers();
-        Room room = new Room();
-        room.setName(roomName);
         Type list = new TypeToken<List<String>>() {
         }.getType();
         List<String> nameOfUser = gson.fromJson(names, list);
+
+        Set<Session> userRoom = Collections.synchronizedSet(new HashSet<>());
         users.forEach(user -> {
             nameOfUser.forEach(name -> {
                 if (user.getUserProperties().get("name").equals(name)) {
-                    room.join(user);
+                    userRoom.add(user);
                 }
             });
         });
-        room.join(session);
+        userRoom.add(session);
+        Room room = new Room(roomName, userRoom);
+        rooms.add(room);
+        /* trả về hai 2 message, 1 cho session hiện tại và 1 cho những session khác*/
+
         RoomResponse roomResponse = new RoomResponse();
-        roomResponse.setMessage("You are joined the new room");
-        roomResponse.addRoom(room.getName());
-        String content = gson.toJson(roomResponse);
-        MessageResponse messageResponse = new MessageResponse(MessageType.SHOW_ROOM, content);
-        String msg = gson.toJson(messageResponse);
-        room.sendMessage(msg);
-
-
+        userRoom.forEach(user -> {
+            if (user.equals(session)) {
+                roomResponse.setMessage("Ban vua tao phong");
+                roomResponse.setNameRoom(roomName);
+                String json = gson.toJson(roomResponse);
+                MessageResponse messageResponse = new MessageResponse(MessageType.LIST_ROOM, json);
+                String content = gson.toJson(messageResponse);
+                try {
+                    user.getBasicRemote().sendText(content);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                roomResponse.setMessage("Ban vua duoc them vao phong");
+                roomResponse.setNameRoom(roomName);
+                String json = gson.toJson(roomResponse);
+                MessageResponse messageResponse = new MessageResponse(MessageType.JOIN_ROOM, json);
+                String content = gson.toJson(messageResponse);
+                try {
+                    user.getBasicRemote().sendText(content);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     /* chức năng lấy về danh sách user đang online trên hệ thống */
@@ -81,10 +168,14 @@ public class Endpoint {
         messageResponse.setMessageType(type);
         messageResponse.setContent(content);
         String msg = gson.toJson(messageResponse);
-        sendRequestUser(session, msg);
+        try {
+            session.getBasicRemote().sendText(msg);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    /* chức năng online vào hệ thống */
+    /* chức năng login vào hệ thống */
     private void handleLoginMessage(MessageReceive messageReceive, Session session) {
         MessageResponse messageResponse = new MessageResponse();
         Gson gson = new Gson();
@@ -92,11 +183,14 @@ public class Endpoint {
         MessageType type = messageReceive.getMessageType();
         if (session.getUserProperties().get("name") == null) {
             session.getUserProperties().put("name", name);
-            String content = gson.toJson(getUserOnline(session));
             messageResponse.setMessageType(type);
-            messageResponse.setContent(content);
+            messageResponse.setContent(name);
             String msg = gson.toJson(messageResponse);
-            sendMessageText(msg);
+            try {
+                session.getBasicRemote().sendText(msg);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -115,9 +209,10 @@ public class Endpoint {
     /* hàm trả về toàn bộ tên của user đang online*/
     private List<String> getUserOnline(Session session) {
         List<String> userOnline = new ArrayList<>();
-        users.forEach(u -> {
-            if (u.getId() != session.getId()) {
-                userOnline.add((String) u.getUserProperties().get("name"));
+        users.forEach(user -> {
+            if (user.getId() != session.getId()) {
+                String name = (String) user.getUserProperties().get("name");
+                userOnline.add(name);
             }
         });
         return userOnline;
@@ -139,11 +234,6 @@ public class Endpoint {
     @OnClose
     public void onClose(Session session) {
         users.remove(session);
-        Gson gson = new Gson();
-        String content = gson.toJson(getUserOnline(session));
-        MessageResponse messageResponse = new MessageResponse(MessageType.LIST_USER, content);
-        String msg = gson.toJson(messageResponse);
-        sendMessageText(msg);
     }
 
     /* xử lý lỗi liên quan khi kết lối ...*/
