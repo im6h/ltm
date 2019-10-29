@@ -34,10 +34,10 @@ public class Endpoint {
         if (msgJson.contains("CREATE_ROOM")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
             handleMessageCreateRoom(roomReceive, session);
-
-        } else if (msgJson.contains("SEND_MESSAGE")) {
+        }
+        if (msgJson.contains("SEND_MESSAGE")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
-            handleSendMessage(roomReceive,session);
+            handleSendMessage(roomReceive, session);
         } else {
             MessageReceive messageReceive = gson.fromJson(msgJson, MessageReceive.class);
             if (messageReceive.getMessageType() == MessageType.LOGIN) {
@@ -45,41 +45,41 @@ public class Endpoint {
             } else if (messageReceive.getMessageType() == MessageType.LIST_USER) {
                 handleMessageListUser(messageReceive, session);
             } else if (messageReceive.getMessageType() == MessageType.GET_MESSAGE) {
-                handleGetMessageRequest(messageReceive,session);
+                handleGetMessageRequest(messageReceive, session);
             }
         }
     }
 
-    private void handleSendMessage(RoomReceive messageReceive,Session set) {
+    private void handleSendMessage(RoomReceive messageReceive, Session set) {
         Gson gson = new Gson();
+
         String nameRoom = messageReceive.getRoomName();
         String message = messageReceive.getUsers();
+        String nameUser = null;
         Set<Session> user = new HashSet<>();
-        for (Room room : rooms){
-            if (room.getName().equals(nameRoom)){
+        for (Room room : rooms) {
+            if (room.getName().equals(nameRoom)) {
                 user = room.getUsers();
             }
         }
-        List<String> msgs = new ArrayList<>();
-        for (Session session : users) {
-            for (Session session1 : user) {
-                if (session1.getId().equals(session.getId())) {
-                    String msg = (String) session1.getUserProperties().get("name") + " : " + message;
-                    msgs.add(msg);
-                }
+        for (Session u : user) {
+            if (u.getId().equals(set.getId())) {
+                nameUser = (String) u.getUserProperties().get("name");
             }
         }
-        String listMsg = gson.toJson(msgs);
-        MessageResponse messageResponse = new MessageResponse(MessageType.SEND_MESSAGE, listMsg);
+        String msg = nameUser + " said: " + message;
+        MessageResponse messageResponse = new MessageResponse(MessageType.SEND_MESSAGE,msg);
         String json = gson.toJson(messageResponse);
-        try {
-            set.getBasicRemote().sendText(json);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        user.forEach(u->{
+            try {
+                u.getBasicRemote().sendText(json);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
-    private void handleGetMessageRequest(MessageReceive messageReceive,Session ses) {
+    private void handleGetMessageRequest(MessageReceive messageReceive, Session ses) {
         Gson gson = new Gson();
         Set<Session> user = new HashSet<>();
         String content = messageReceive.getContent();
