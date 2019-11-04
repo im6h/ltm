@@ -11,6 +11,7 @@ import javax.websocket.*;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.util.*;
 
 @ServerEndpoint(value = "/socket")
@@ -23,21 +24,24 @@ public class Endpoint {
     @OnOpen
     public void onOpen(Session session) {
         users.add(session);
+        sendAllUser();
     }
 
     /* hàm nhận tin nhắn từ phía client và gửi trả tin nhắn cho client */
     @OnMessage
     public void onMessage(Session session, String msgJson) throws IOException {
         Gson gson = new Gson();
-        List<String> addRoom = new ArrayList<>();
-        Set<Room> rooms = Collections.synchronizedSet(new HashSet<>());
+        List<String> userName = new ArrayList<>();
         if (msgJson.contains("CREATE_ROOM")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
             handleMessageCreateRoom(roomReceive, session);
-        }
-        if (msgJson.contains("SEND_MESSAGE")) {
+        } else if (msgJson.contains("SEND_MESSAGE")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
             handleSendMessage(roomReceive, session);
+        } else if (msgJson.contains("SEND_FILE")) {
+            RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
+            handleSendFile(roomReceive, session);
+
         } else {
             MessageReceive messageReceive = gson.fromJson(msgJson, MessageReceive.class);
             if (messageReceive.getMessageType() == MessageType.LOGIN) {
@@ -48,6 +52,38 @@ public class Endpoint {
                 handleGetMessageRequest(messageReceive, session);
             }
         }
+    }
+    @OnMessage(maxMessageSize = 20000000)
+    public void messageBinary(Session session, ByteBuffer byteBuffer){
+        users.forEach(u->{
+            try {
+                u.getBasicRemote().sendBinary(byteBuffer);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void handleSendFile(RoomReceive roomReceive, Session session) {
+        Gson gson = new Gson();
+
+        String nameRoom = roomReceive.getRoomName();
+        String message = roomReceive.getUsers();
+        Set<Session> user = new HashSet<>();
+        for (Room room : rooms) {
+            if (room.getName().equals(nameRoom)) {
+                user = room.getUsers();
+            }
+        }
+        MessageResponse messageResponse = new MessageResponse(MessageType.RESPONSE_FILE, message);
+        String json = gson.toJson(messageResponse);
+        user.forEach(u -> {
+            try {
+                u.getBasicRemote().sendText(json);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     private void handleSendMessage(RoomReceive messageReceive, Session set) {
@@ -68,9 +104,9 @@ public class Endpoint {
             }
         }
         String msg = nameUser + " said: " + message;
-        MessageResponse messageResponse = new MessageResponse(MessageType.SEND_MESSAGE,msg);
+        MessageResponse messageResponse = new MessageResponse(MessageType.RESPONSE_MESSAGE, msg);
         String json = gson.toJson(messageResponse);
-        user.forEach(u->{
+        user.forEach(u -> {
             try {
                 u.getBasicRemote().sendText(json);
             } catch (IOException e) {
@@ -94,8 +130,8 @@ public class Endpoint {
         for (Session session : users) {
             for (Session session1 : user) {
                 if (session1.getId().equals(session.getId())) {
-                    String msg = (String) session1.getUserProperties().get("name") + " login";
-                    msgs.add(msg);
+//                    String msg = (String) session1.getUserProperties().get("name") + " login";
+//                    msgs.add(msg);
                 }
             }
         }
@@ -177,21 +213,11 @@ public class Endpoint {
 
     /* chức năng login vào hệ thống */
     private void handleLoginMessage(MessageReceive messageReceive, Session session) {
-        MessageResponse messageResponse = new MessageResponse();
-        Gson gson = new Gson();
         String name = messageReceive.getContent();
-        MessageType type = messageReceive.getMessageType();
         if (session.getUserProperties().get("name") == null) {
             session.getUserProperties().put("name", name);
-            messageResponse.setMessageType(type);
-            messageResponse.setContent(name);
-            String msg = gson.toJson(messageResponse);
-            try {
-                session.getBasicRemote().sendText(msg);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
+        sendAllUser();
     }
 
     /* chức năng gửi tin nhắn cho client */
@@ -218,22 +244,33 @@ public class Endpoint {
         return userOnline;
     }
 
-    private void sendRequestUser(Session session, String msg) {
-        users.forEach(u -> {
-            if (u.equals(session)) {
-                try {
-                    u.getBasicRemote().sendText(msg);
-                } catch (IOException e) {
-                    e.printStackTrace();
+    private void sendAllUser() {
+        Gson gson = new Gson();
+        for (Session ss : users) {
+            List<String> userName = new ArrayList<>();
+            for (Session sess1 : users) {
+                if (ss.equals(sess1)) {
+                    continue;
+                } else {
+                    userName.add((String) sess1.getUserProperties().get("name"));
                 }
             }
-        });
+            String json = gson.toJson(userName);
+            MessageResponse messageResponse = new MessageResponse(MessageType.LIST_USER, json);
+            String msg = gson.toJson(messageResponse);
+            try {
+                ss.getBasicRemote().sendText(msg);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /* đóng kết nối, dĩ nhiên rồi .... */
     @OnClose
     public void onClose(Session session) {
         users.remove(session);
+        sendAllUser();
     }
 
     /* xử lý lỗi liên quan khi kết lối ...*/

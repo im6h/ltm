@@ -7,5 +7,6 @@ public enum MessageType {
     LIST_ROOM,
     JOIN_ROOM,
     GET_MESSAGE,
-    SEND_MESSAGE,
+    RESPONSE_MESSAGE,
+    RESPONSE_FILE
 }
