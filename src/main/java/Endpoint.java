@@ -37,7 +37,12 @@ public class Endpoint {
             handleMessageCreateRoom(roomReceive, session);
         } else if (msgJson.contains("SEND_MESSAGE")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
-            handleSendMessage(roomReceive, session);
+            if (roomReceive.getUsers().contains("https://")){
+                handleURL(roomReceive,session);
+            }
+            else{
+                handleSendMessage(roomReceive, session);
+            }
         } else if (msgJson.contains("SEND_FILE")) {
             RoomReceive roomReceive = gson.fromJson(msgJson, RoomReceive.class);
             handleSendFile(roomReceive, session);
@@ -53,11 +58,43 @@ public class Endpoint {
             }
         }
     }
-    @OnMessage(maxMessageSize = 20000000)
-    public void messageBinary(Session session, ByteBuffer byteBuffer){
+
+    private void handleURL(RoomReceive messageReceive, Session ses) {
+        Gson gson = new Gson();
+
+        String nameRoom = messageReceive.getRoomName();
+        String message = messageReceive.getUsers();
+        String nameUser = null;
+        Set<Session> user = new HashSet<>();
+        for (Room room : rooms) {
+            if (room.getName().equals(nameRoom)) {
+                user = room.getUsers();
+            }
+        }
+        for (Session u : user) {
+            if (u.getId().equals(ses.getId())) {
+                nameUser = (String) u.getUserProperties().get("name");
+            }
+        }
+        MessageResponse messageResponse = new MessageResponse(MessageType.SHOW_URL, message);
+        String json = gson.toJson(messageResponse);
+        user.forEach(u -> {
+            try {
+                u.getBasicRemote().sendText(json);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
+    }
+
+    @OnMessage(maxMessageSize = 30000000)
+    public void onMessage(Session session, byte[] img) {
+        System.out.println("receive");
+        ByteBuffer buf = ByteBuffer.wrap(img);
         users.forEach(u->{
             try {
-                u.getBasicRemote().sendBinary(byteBuffer);
+                u.getBasicRemote().sendBinary(buf);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -214,9 +251,9 @@ public class Endpoint {
     /* chức năng login vào hệ thống */
     private void handleLoginMessage(MessageReceive messageReceive, Session session) {
         String name = messageReceive.getContent();
-        if (session.getUserProperties().get("name") == null) {
-            session.getUserProperties().put("name", name);
-        }
+//        if (session.getUserProperties().get("name") == null) {
+        session.getUserProperties().put("name", name);
+//        }
         sendAllUser();
     }
 
